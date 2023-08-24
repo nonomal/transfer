@@ -10,18 +10,19 @@ import (
 	"path/filepath"
 	"regexp"
 	"time"
-	"transfer/apis"
-	"transfer/utils"
+
+	"github.com/Mikubill/transfer/apis"
+	"github.com/Mikubill/transfer/utils"
 )
 
 const (
-	downloadDetails = "https://cowtransfer.com/api/transfer/transferdetail?url=%s&treceive=undefined&passcode=%s"
-	downloadFiles   = "https://cowtransfer.com/api/transfer/files?page=0&guid=%s"
+	downloadDetails = "https://cowtransfer.com/api/transfer/v2/transferdetail?url=%s&treceive=undefined&passcode=%s"
+	downloadFiles   = "https://cowtransfer.com/api/transfer/v2/files?page=0&guid=%s"
 	downloadConfig  = "https://cowtransfer.com/api/transfer/download?guid=%s"
 )
 
 var (
-	matcher = regexp.MustCompile("(cowtransfer\\.com|c-t\\.work)/s/[0-9a-f]{14}")
+	matcher = regexp.MustCompile(`(cowtransfer\.com|c-t\.work)/s/[0-9a-f]{14}`)
 	reg     = regexp.MustCompile("[0-9a-f]{14}")
 )
 
@@ -35,15 +36,18 @@ func (b cowTransfer) DoDownload(link string, config apis.DownConfig) error {
 
 func (b cowTransfer) initDownload(v string, config apis.DownConfig) error {
 	fileID := reg.FindString(v)
-	if config.DebugMode {
+	if apis.DebugMode {
 		log.Println("starting download...")
 		log.Println("step1 -> api/getGuid")
 	}
 	fmt.Printf("Remote: %s\n", v)
 
 	body, err := fetchWithCookie(fmt.Sprintf(downloadDetails, fileID, config.Ticket), fileID)
+	if err != nil {
+		return fmt.Errorf("request DownloadDetails returns error: %s", err)
+	}
 
-	if config.DebugMode {
+	if apis.DebugMode {
 		log.Printf("returns: %v\n", string(body))
 	}
 
@@ -65,8 +69,11 @@ func (b cowTransfer) initDownload(v string, config apis.DownConfig) error {
 	}
 
 	body, err = fetchWithCookie(fmt.Sprintf(downloadFiles, details.GUID), fileID)
+	if err != nil {
+		return fmt.Errorf("request FileDetails returns error: %s", err)
+	}
 
-	if config.DebugMode {
+	if apis.DebugMode {
 		log.Printf("returns: %v\n", string(body))
 	}
 
@@ -78,7 +85,7 @@ func (b cowTransfer) initDownload(v string, config apis.DownConfig) error {
 	for _, item := range files.Details {
 		err = downloadItem(item, config)
 		if err != nil {
-			fmt.Println(err)
+			return err
 		}
 	}
 	return nil
@@ -105,10 +112,10 @@ func fetchWithCookie(link, fileID string) ([]byte, error) {
 }
 
 func downloadItem(item downloadDetailsBlock, baseConf apis.DownConfig) error {
-	if baseConf.DebugMode {
+	if apis.DebugMode {
 		log.Println("step2 -> api/getConf")
 		log.Printf("fileName: %s\n", item.FileName)
-		log.Printf("fileSize: %s\n", item.Size)
+		log.Printf("fileSize: %2.f\n", item.Size)
 		log.Printf("GUID: %s\n", item.GUID)
 	}
 	configURL := fmt.Sprintf(downloadConfig, item.GUID)
@@ -128,7 +135,7 @@ func downloadItem(item downloadDetailsBlock, baseConf apis.DownConfig) error {
 	}
 
 	_ = resp.Body.Close()
-	if baseConf.DebugMode {
+	if apis.DebugMode {
 		log.Printf("returns: %v\n", string(body))
 	}
 	config := new(downloadConfigResponse)
@@ -136,7 +143,7 @@ func downloadItem(item downloadDetailsBlock, baseConf apis.DownConfig) error {
 		return fmt.Errorf("unmatshal DownloaderConfig returns error: %s, onfile: %s", err, item.FileName)
 	}
 
-	if baseConf.DebugMode {
+	if apis.DebugMode {
 		log.Println("step3 -> startDownload")
 	}
 	filePath, err := filepath.Abs(baseConf.Prefix)
@@ -153,11 +160,10 @@ func downloadItem(item downloadDetailsBlock, baseConf apis.DownConfig) error {
 	}
 
 	baseConf.Prefix = filePath
-	err = apis.DownloadFile(&apis.DownloaderConfig{
-		Link:     config.Link,
-		Config:   baseConf,
-		Modifier: addHeaders,
-	})
+	baseConf.Link = config.Link
+	baseConf.Modifier = addHeaders
+
+	err = apis.DownloadFile(baseConf)
 	if err != nil {
 		return fmt.Errorf("failed DownloaderConfig with error: %s, onfile: %s", err, item.FileName)
 	}

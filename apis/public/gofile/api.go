@@ -2,8 +2,8 @@ package gofile
 
 import (
 	"fmt"
-	"transfer/apis"
-	"transfer/utils"
+	"github.com/Mikubill/transfer/apis"
+	"github.com/Mikubill/transfer/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -21,6 +21,7 @@ type goFile struct {
 	folderID   string
 	folderName string
 
+	downloadLink string
 	// baseBody     []byte
 
 	// boundary     string

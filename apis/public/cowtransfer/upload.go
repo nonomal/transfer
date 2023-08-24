@@ -6,22 +6,24 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"strconv"
 	"sync"
 	"time"
-	"transfer/apis"
-	"transfer/utils"
+
+	"github.com/Mikubill/transfer/apis"
+	"github.com/Mikubill/transfer/utils"
 
 	"github.com/cheggaaa/pb/v3"
 	cmap "github.com/orcaman/concurrent-map"
 )
 
 const (
-	prepareSend    = "https://cowtransfer.com/api/transfer/preparesend"
+	prepareSend    = "https://cowtransfer.com/api/transfer/v2/preparesend"
 	setPassword    = "https://cowtransfer.com/api/transfer/v2/bindpasscode"
-	beforeUpload   = "https://cowtransfer.com/api/transfer/beforeupload"
-	uploadFinish   = "https://cowtransfer.com/api/transfer/uploaded"
-	uploadComplete = "https://cowtransfer.com/api/transfer/complete"
+	beforeUpload   = "https://cowtransfer.com/api/transfer/v2/beforeupload"
+	uploadFinish   = "https://cowtransfer.com/api/transfer/v2/uploaded"
+	uploadComplete = "https://cowtransfer.com/api/transfer/v2/complete"
 	initUpload     = "https://upload.qiniup.com/buckets/cftransfer/objects/%s/uploads"
 	doUpload       = "https://upload.qiniup.com/buckets/cftransfer/objects/%s/uploads/%s/%d"
 	finUpload      = "https://upload.qiniup.com/buckets/cftransfer/objects/%s/uploads/%s"
@@ -121,8 +123,16 @@ func (b cowTransfer) DoUpload(name string, size int64, file io.Reader) error {
 }
 
 func (b cowTransfer) uploader(ch *chan *uploadPart, conf uploadConfig) {
+	retry := 0
 	for item := range *ch {
 	Start:
+		retry++
+		if retry > 10 {
+			fmt.Printf("Upload part %d failed after 10 retries\n", item.count)
+			// temp fix issue #52, should be handled by uploader
+			os.Exit(1)
+		}
+
 		postURL := fmt.Sprintf(doUpload, conf.config.EncodeID, conf.config.ID, item.count)
 		if apis.DebugMode {
 			log.Printf("part %d start uploading, size: %d", item.count, len(item.content))
@@ -256,7 +266,7 @@ func (b cowTransfer) completeUpload() (string, error) {
 	if err := json.Unmarshal(body, &rBody); err != nil {
 		return "", fmt.Errorf("read finish resp failed: %s", err)
 	}
-	if rBody.Status != true {
+	if !rBody.Status {
 		return "", fmt.Errorf("finish upload failed: complete is not true")
 	}
 	//fmt.Printf("Short Download Code: %s\n\n", rBody.TempDownloadCode)
@@ -265,8 +275,10 @@ func (b cowTransfer) completeUpload() (string, error) {
 
 func (b cowTransfer) getSendConfig(totalSize int64) (*prepareSendResp, error) {
 	data := map[string]string{
-		"validDays": "1",
-		"totalSize": strconv.FormatInt(totalSize, 10),
+		"validDays":      strconv.Itoa(b.Config.validDays),
+		"totalSize":      strconv.FormatInt(totalSize, 10),
+		"enableDownload": "true",
+		"enablePreview":  "true",
 	}
 	body, err := b.newMultipartRequest(prepareSend, data, requestConfig{
 		debug: apis.DebugMode,
@@ -282,7 +294,7 @@ func (b cowTransfer) getSendConfig(totalSize int64) (*prepareSendResp, error) {
 	if err != nil {
 		return nil, err
 	}
-	if config.Error != false {
+	if config.Error {
 		return nil, fmt.Errorf(config.ErrorMessage)
 	}
 	if b.Config.passCode != "" {

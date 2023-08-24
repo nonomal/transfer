@@ -7,8 +7,9 @@ import (
 	"log"
 	"net/url"
 	"time"
-	"transfer/apis"
-	"transfer/utils"
+
+	"github.com/Mikubill/transfer/apis"
+	"github.com/Mikubill/transfer/utils"
 )
 
 // Command Types
@@ -17,7 +18,7 @@ const (
 	notionHost      = "https://www.notion.so"
 )
 
-func PrintStruct(emp interface{}) {
+func PrintStruct(emp any) {
 	empJSON, err := json.MarshalIndent(emp, "", "  ")
 	if err != nil {
 		log.Fatalf(err.Error())

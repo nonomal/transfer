@@ -7,7 +7,7 @@ jobs:
       - name: install
         uses: actions/setup-go@v1
         with:
-          go-version: 1.14.x
+          go-version: 1.18.x
 
       - name: checkout
         uses: actions/checkout@v1
@@ -19,13 +19,13 @@ jobs:
 
       - name: test - default
         run: |
-          ./ci-test-linux-amd64 --no-progress -o test -f $(./ci-test-linux-amd64 --silent go.sum)
+          ./ci-test-linux-amd64 --no-progress -o test -f $(./ci-test-linux-amd64 cat --silent go.sum)
           cmp test go.sum
 
       - name: test - multi
         run: |
-          ./ci-test-linux-amd64 cow --no-progress crypto
-          ./ci-test-linux-amd64 cow --no-progress -s crypto
+          ./ci-test-linux-amd64 wet --no-progress crypto
+          ./ci-test-linux-amd64 wet --no-progress -s crypto
 
       - name: test - all
         run: |

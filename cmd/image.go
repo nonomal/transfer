@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"transfer/apis/image"
+	"github.com/Mikubill/transfer/apis/image"
 
 	"github.com/spf13/cobra"
 )
@@ -16,8 +16,7 @@ Upload a image to imageBed.
 Default backend is ali.backend, you can modify it by -b flag.
 
 Backend support:
-  baidu(bd), ccupload(cc), prntscr(pr), smms(sm), sogou(sg), 
-  toutiao(tt), vimcn(vm), suning(sn), telegraph(tg)
+  ccupload(cc), prntscr(pr), telegraph(tg)
 
 Example:
   # simply upload
